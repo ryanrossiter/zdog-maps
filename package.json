@@ -1,0 +1,25 @@
+{
+  "name": "zdog-maps",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "webpack": "webpack",
+    "start": "webpack-dev-server"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@babel/core": "^7.5.4",
+    "@babel/preset-env": "^7.5.4",
+    "babel-loader": "^8.0.6",
+    "papaparse": "^5.0.0",
+    "svg-points": "^6.0.1",
+    "webpack": "^4.35.3",
+    "zdog": "^1.1.0"
+  },
+  "devDependencies": {
+    "webpack-cli": "^3.3.5",
+    "webpack-dev-server": "^3.7.2"
+  }
+}
