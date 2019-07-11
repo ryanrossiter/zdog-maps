@@ -2,6 +2,7 @@ import Zdog from 'zdog';
 import Papa from 'papaparse';
 
 import ZdogMap from './ZdogMap';
+import SvgMap from './SvgMap';
 
 const TEST_BUILDINGS = [
 	[[44.230189, -76.492001], [44.225143, -76.486592], [44.230299, -76.481693]],
@@ -43,13 +44,18 @@ document.addEventListener('DOMContentLoaded', () => {
 				addCoords(coords[0]);
 			}
 
-			let map = new ZdogMap({
-				container: document.querySelector("#container"),
-				zdogContainer: document.querySelector("#zdog-svg"),
+			let zDogMap = new ZdogMap({
 				buildings
 			});
-			map.render();
-			console.log("done");
+			zDogMap.render();
+			console.log("Done Zdog");
+
+			let svgMap = new SvgMap({
+				container: document.querySelector("#container"),
+				buildings
+			});
+			svgMap.render();
+			console.log("Done SVG");
 		}
 	});
 
