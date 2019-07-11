@@ -45,6 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 			let map = new ZdogMap({
 				container: document.querySelector("#container"),
+				zdogContainer: document.querySelector("#zdog-svg"),
 				buildings
 			});
 			map.render();

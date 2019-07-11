@@ -1,15 +1,52 @@
 import Zdog from 'zdog';
 import { toPath } from 'svg-points';
+import { QuadTree, Box, Point } from 'js-quadtree';
+import convertToBezier from './convertToBezier';
 
-const ZOOM_DELTA = 0.08;
+const ZOOM_DELTA = 0.01;
 const PAN_DELTA = 1;
+
+function radiansToDegrees (_val) {  
+  return _val * (Math.PI/180);
+}
+
+function makeZdogBezier (_path) {   
+    let arr = [];
+    arr[0] = {x: _path[0].x, y: _path[0].y};    
+    for(let i = 1; i < _path.length; i++) {
+        if(i % 3 == 0 ) {
+            var key = "bezier";
+            var obj = {};
+            obj[key] = [
+                {x: _path[i-2].x, y: _path[i-2].y},
+                {x: _path[i-1].x, y: _path[i-1].y},
+                {x: _path[i].x, y: _path[i].y}
+            ];
+            arr.push(obj);      
+        }
+    }
+    return arr;
+}
+
+let animationObject = { zoom:1, rotationY:0, rotationZ: -30  };
+
+let scene = new Zdog.Anchor({
+  translate: {x: 240, y: 240},
+    scale: 1
+});
+
+var mainGroup = new Zdog.Group({
+  addTo: scene,
+  translate: {x: -0, y: 0, z: 110 }
+});
 
 export default class ZdogMap {
     constructor({
-        origin={ latitude: 44.26256742106572, longitude: -76.6080998780754 },
-        zoom=0.8,
+        origin={ latitude: 44.24, longitude: -76.53},
+        zoom=1,
         container,
-        buildings
+        buildings,
+        zdogContainer
     }) {
         this.container = container;
         this.origin = origin;
@@ -17,6 +54,21 @@ export default class ZdogMap {
         this.buildings = buildings;
         this.offX = 0;
         this.offY = 0;
+
+        this.zdogContainer = zdogContainer;
+
+        let points = [];
+        for (let { center, coordinates } of buildings) {
+            points.push({
+                ...this.project(center.latitude, center.longitude),
+                coordinates
+            });
+        }
+
+        this.tree = new QuadTree(
+            new Box(-1000, -1000, 2000, 2000), {
+                capacity: 1000,
+            }, points);
 
         this.svgElem = document.createElementNS("http://www.w3.org/2000/svg", 'svg');
         this.svgElem.setAttribute('width', 500);
@@ -49,6 +101,7 @@ export default class ZdogMap {
     setTransform() {
         this.buildingGroup.setAttribute('transform',
             `translate(${-this.offX / 2} ${-this.offY / 2}) scale(${this.zoom}) translate(${this.offX * 1.5} ${this.offY * 1.5})`);
+        // this.render();
     }
 
     project(lat, lng) {
@@ -77,19 +130,37 @@ export default class ZdogMap {
 
     render() {
         // remove all elements
-        // while (this.buildingGroup.firstChild) {
-        //     this.buildingGroup.removeChild(this.buildingGroup.firstChild);
-        // }
+        while (this.buildingGroup.firstChild) {
+            this.buildingGroup.removeChild(this.buildingGroup.firstChild);
+        }
 
-        for (let { center, coordinates } of this.buildings) {
+        let { x: cx, y: cy } = this.project(this.origin.latitude, this.origin.longitude);
+        let visibleBuildings = this.tree.query(new Box(cx - this.offX / this.zoom - 200, cy - this.offY / this.zoom - 200, 400, 400));
+        console.log(visibleBuildings);
+        for (let building of visibleBuildings) {
+            // console.log(building);
             // if (!this.inView(center.latitude, center.longitude)) continue;
 
-            let d = toPath(coordinates.map(([latitude, longitude]) => this.project(latitude, longitude)));
+            if (!building.path) {
+                building.path = toPath(building.coordinates.map(([latitude, longitude]) => this.project(latitude, longitude)));
+            }
 
             let path = document.createElementNS("http://www.w3.org/2000/svg", 'path');
-            path.setAttribute('d', d);
+            path.setAttribute('d', building.path);
             path.setAttribute('fill', 'green');
             this.buildingGroup.appendChild(path);
+
+            let lensShape = new Zdog.Shape({
+              translate: {x: 0, y: 0, z: 0 },
+              addTo: mainGroup,
+              path:  convertToBezier(building.path) ,
+              closed: true,
+              stroke: 2,
+                fill: false,
+              color: '#000000CF'
+            });
         }
+
+        scene.renderGraphSvg(this.zdogContainer);
     }
 }
