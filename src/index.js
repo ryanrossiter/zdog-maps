@@ -17,14 +17,16 @@ document.addEventListener('DOMContentLoaded', () => {
 		complete: ({ data }) => {
 			let buildings = [];
 			// data = data.filter(({ shape_area, building_class }) => parseFloat(shape_area) > 50);
-
-			for (let { geo_shape, geo_point_2d } of data) {
+			
+			for (let { geo_shape, geo_point_2d, building_id } of data) {
 				if (!geo_shape) continue;
 
-				let coords = JSON.parse(geo_shape).coordinates;
-				// if (coords[0][0].length > 2) console.log(coords);
-				// buildings.push(coords[0]);
-				// continue;
+				let id = parseInt(building_id);
+				let geoShape = JSON.parse(geo_shape);
+				// if (geoShape.type !== "Polygon") {
+				// 	console.log(geoShape);
+				// 	continue;
+				// }
 				let [lats, lons] = geo_point_2d.split(', ');
 				let center = { latitude: parseFloat(lats), longitude: parseFloat(lons) };
 
@@ -32,16 +34,14 @@ document.addEventListener('DOMContentLoaded', () => {
 					if (typeof coords[0][0] !== 'number') {
 						for (let c of coords) addCoords(c);
 					} else {
-						for (let c of coords) {
-							buildings.push({
-								center,
-								coordinates: coords.map(c=>c.reverse())
-							});
-						}
+						buildings.push({
+							id, center,
+							coordinates: coords.map(c=>c.reverse())
+						});
 					}
 				}
 
-				addCoords(coords[0]);
+				addCoords(geoShape.coordinates);
 			}
 
 			let zDogMap = new ZdogMap({
@@ -50,12 +50,12 @@ document.addEventListener('DOMContentLoaded', () => {
 			zDogMap.render();
 			console.log("Done Zdog");
 
-			let svgMap = new SvgMap({
-				container: document.querySelector("#container"),
-				buildings
-			});
-			svgMap.render();
-			console.log("Done SVG");
+			// let svgMap = new SvgMap({
+			// 	container: document.querySelector("#container"),
+			// 	buildings
+			// });
+			// svgMap.render();
+			// console.log("Done SVG");
 		}
 	});
 

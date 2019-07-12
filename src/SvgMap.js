@@ -1,5 +1,6 @@
 import { toPath } from 'svg-points';
 import { QuadTree, Box, Point } from 'js-quadtree';
+import Projection from './Projection';
 
 const ZOOM_DELTA = 0.003;
 const PAN_DELTA = 1;
@@ -17,6 +18,8 @@ export default class SvgMap {
         this.container = container;
         this.origin = origin;
         this.zoom = zoom;
+        this.projection = new Projection(origin, WIDTH, HEIGHT);
+
         this.buildings = buildings;
         this.offX = 0;
         this.offY = 0;
@@ -24,7 +27,7 @@ export default class SvgMap {
         let points = [];
         for (let { center, coordinates } of buildings) {
             points.push({
-                ...this.project(center.latitude, center.longitude),
+                ...this.projection.project(center.latitude, center.longitude),
                 coordinates
             });
         }
@@ -43,10 +46,13 @@ export default class SvgMap {
         this.container.appendChild(this.svgElem);
 
         this.buildingGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g');
+
         this.svgElem.appendChild(this.buildingGroup);
 
         this.container.addEventListener('wheel', this.onScroll.bind(this));
         this.container.addEventListener('mousemove', this.onMouseMove.bind(this));
+
+        this.setTransform();
     }
 
     onScroll({ wheelDeltaY: dy, wheelDeltaX: dx }) {
@@ -63,32 +69,11 @@ export default class SvgMap {
     }
 
     setTransform() {
-        this.buildingGroup.setAttribute('transform',
-            `translate(${-this.offX / 2} ${-this.offY / 2}) scale(${this.zoom}) translate(${this.offX * 1.5} ${this.offY * 1.5})`);
+        this.buildingGroup.setAttribute('transform', `
+            translate(${(1 - this.zoom) * WIDTH / 2} ${(1 - this.zoom) * HEIGHT / 2})
+            scale(${this.zoom})
+            translate(${this.offX} ${this.offY})`);
         this.render();
-    }
-
-    project(lat, lng) {
-        // Size of the map
-        const lngDelta = ZOOM_DELTA, latDelta = ZOOM_DELTA * HEIGHT / WIDTH;
-        // X and Y boundaries
-        var westLong = this.origin.longitude + lngDelta;
-        var eastLong = this.origin.longitude - lngDelta;
-        var northLat = this.origin.latitude - latDelta;
-        var southLat = this.origin.latitude + latDelta;
-        var pi = 3.1415926535898;
-        var mapLatBottomDegree = southLat * pi / 180;
-        //var longitude = -6.266327;//-9.0503;
-        //var latitude = 53.2734;
-        var mapLngDelta = -lngDelta * 2;
-
-        var lontest = WIDTH - (lng - westLong) * (WIDTH / mapLngDelta);
-
-        lat = lat * pi / 180;
-        var worldMapWidth = ((WIDTH / mapLngDelta) * 360) / (2 * pi);
-        var mapOffsetY = (worldMapWidth / 2 * Math.log((1 + Math.sin(mapLatBottomDegree)) / (1 - Math.sin(mapLatBottomDegree ))));    
-        var lattest = ((worldMapWidth / 2 * Math.log((1 + Math.sin(lat )) / (1 - Math.sin(lat )))) - mapOffsetY);
-        return { x: lontest, y: lattest };
     }
 
     render() {
@@ -97,15 +82,16 @@ export default class SvgMap {
             this.buildingGroup.removeChild(this.buildingGroup.firstChild);
         }
 
-        let { x: cx, y: cy } = this.project(this.origin.latitude, this.origin.longitude);
-        let visibleBuildings = this.tree.query(new Box(cx - WIDTH * 0.6 / 2 - this.offX, cy - HEIGHT * 0.6 / 2 - this.offY, WIDTH * 0.6, HEIGHT * 0.6));
+        let { x: cx, y: cy } = this.projection.project(this.origin.latitude, this.origin.longitude);
+
+        let visibleBuildings = this.tree.query(new Box(cx - this.offX - WIDTH / 2 / this.zoom, cy - this.offY - HEIGHT / 2 / this.zoom, WIDTH / this.zoom, HEIGHT / this.zoom));
         
         for (let building of visibleBuildings) {
             // console.log(building);
             // if (!this.inView(center.latitude, center.longitude)) continue;
 
             if (!building.path) {
-                building.path = toPath(building.coordinates.map(([latitude, longitude]) => this.project(latitude, longitude)));
+                building.path = toPath(building.coordinates.map(([latitude, longitude]) => this.projection.project(latitude, longitude)));
             }
 
             let path = document.createElementNS("http://www.w3.org/2000/svg", 'path');
