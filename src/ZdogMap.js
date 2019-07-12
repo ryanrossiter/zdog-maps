@@ -1,32 +1,18 @@
 import Zdog from 'zdog';
 import { toPath } from 'svg-points';
 import { QuadTree, Box, Point } from 'js-quadtree';
-import convertToBezier from './convertToBezier';
 
-const ZOOM_DELTA = 0.02;
+const ZOOM_DELTA = 0.002;
 const PAN_DELTA = 1;
+
+let frames = 0;
+let lastFrameTime = Date.now();
+window.fps = 0;
 
 function radiansToDegrees (_val) {  
   return _val * (Math.PI/180);
 }
 
-function makeZdogBezier (_path) {   
-    let arr = [];
-    arr[0] = {x: _path[0].x, y: _path[0].y};    
-    for(let i = 1; i < _path.length; i++) {
-        if(i % 3 == 0 ) {
-            var key = "bezier";
-            var obj = {};
-            obj[key] = [
-                {x: _path[i-2].x, y: _path[i-2].y},
-                {x: _path[i-1].x, y: _path[i-1].y},
-                {x: _path[i].x, y: _path[i].y}
-            ];
-            arr.push(obj);      
-        }
-    }
-    return arr;
-}
 
 export default class ZdogMap {
     constructor({
@@ -62,7 +48,7 @@ export default class ZdogMap {
             element: zdogElement,
             
             scale: 1,
-            // rotate: {y: Zdog.TAU/8}
+            rotate: {x: Zdog.TAU/6, z: Zdog.TAU / 8}
         });
 
         let mainGroup = new Zdog.Group({
@@ -117,37 +103,73 @@ export default class ZdogMap {
         return { x: lontest, y: lattest };
     }
 
+    genZdogWall(p0, p1, height) {
+        new Zdog.Shape({
+            addTo: this.zdog.mainGroup,
+            path: [
+                { ...p0, z: 0 },
+                { ...p1, z: 0 },
+                { ...p1, z: height },
+                { ...p0, z: height },
+            ],
+            stroke: 2,
+            fill: true,
+            color: '#0000AA'
+        });
+    }
+
+    genZdogFloor(points, height=0, color="#000") {
+        new Zdog.Shape({
+          addTo: this.zdog.mainGroup,
+          path: points.map(p => ({ ...p, z: height })),
+          closed: true,
+          stroke: 2,
+          fill: true,
+          color
+        });
+    }
+
+    genZdogBuilding(points, height) {
+        for (let i = 0; i < points.length; i++) {
+            let p0 = points[i],
+                p1 = points[(i + 1) % points.length];
+
+            this.genZdogWall(p0, p1, height);
+        }
+
+        this.genZdogFloor(points, height);
+    }
+
     render() {
 
         let { x: cx, y: cy } = this.project(this.origin.latitude, this.origin.longitude);
-        let visibleBuildings = this.tree.query(new Box(cx - this.offX / this.zoom - 200, cy - this.offY / this.zoom - 200, 400, 400));
+        let visibleBuildings = this.tree.query(new Box(cx - 200, cy - 200, 400, 400));
         console.log(visibleBuildings);
         for (let building of visibleBuildings) {
             // console.log(building);
             // if (!this.inView(center.latitude, center.longitude)) continue;
 
             if (!building.path) {
-                building.path = toPath(building.coordinates.map(([latitude, longitude]) => this.project(latitude, longitude)));
+                building.points = building.coordinates.map(([latitude, longitude]) => this.project(latitude, longitude))
+                building.path = toPath(building.points);
             }
 
-            new Zdog.Shape({
-              translate: {x: 0, y: 0, z: 0 },
-              addTo: this.zdog.mainGroup,
-              path:  convertToBezier(building.path),
-              closed: true,
-              stroke: 2,
-                fill: false,
-              color: '#000000CF'
-            });
+            this.genZdogBuilding(building.points, Math.random() * 10);
         }
 
         this.renderLoop();
     }
 
     renderLoop() {
-        this.zdog.illustration.rotate.x += 0.03;
-        this.zdog.illustration.rotate.y += 0.025;
+        this.zdog.illustration.rotate.z += 0.03;
         this.zdog.illustration.updateRenderGraph();
+
+        frames++;
+        if (Date.now() - lastFrameTime > 1000) {
+            lastFrameTime = Date.now();
+            window.fps = frames;
+            frames = 0;
+        }
 
         requestAnimationFrame(this.renderLoop.bind(this));
     }

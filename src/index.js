@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
 		delimiter: ';',
 		complete: ({ data }) => {
 			let buildings = [];
-			data = data.filter(({ shape_area, building_class }) => parseFloat(shape_area) > 50 && building_class === "Commercial");
+			// data = data.filter(({ shape_area, building_class }) => parseFloat(shape_area) > 50);
 
 			for (let { geo_shape, geo_point_2d } of data) {
 				if (!geo_shape) continue;

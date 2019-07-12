@@ -1,8 +1,11 @@
 import { toPath } from 'svg-points';
 import { QuadTree, Box, Point } from 'js-quadtree';
 
-const ZOOM_DELTA = 0.01;
+const ZOOM_DELTA = 0.003;
 const PAN_DELTA = 1;
+
+const WIDTH = 500;
+const HEIGHT = 500;
 
 export default class SvgMap {
     constructor({
@@ -32,8 +35,8 @@ export default class SvgMap {
             }, points);
 
         this.svgElem = document.createElementNS("http://www.w3.org/2000/svg", 'svg');
-        this.svgElem.setAttribute('width', 500);
-        this.svgElem.setAttribute('height', 500);
+        this.svgElem.setAttribute('width', WIDTH);
+        this.svgElem.setAttribute('height', HEIGHT);
         this.svgElem.style.pointerEvents = "none";
         this.svgElem.style.border = "1px solid blue";
 
@@ -62,28 +65,27 @@ export default class SvgMap {
     setTransform() {
         this.buildingGroup.setAttribute('transform',
             `translate(${-this.offX / 2} ${-this.offY / 2}) scale(${this.zoom}) translate(${this.offX * 1.5} ${this.offY * 1.5})`);
-        // this.render();
+        this.render();
     }
 
     project(lat, lng) {
         // Size of the map
-        var width = 500;
-        var height = 500;
+        const lngDelta = ZOOM_DELTA, latDelta = ZOOM_DELTA * HEIGHT / WIDTH;
         // X and Y boundaries
-        var westLong = this.origin.longitude + ZOOM_DELTA * this.zoom;
-        var eastLong = this.origin.longitude - ZOOM_DELTA * this.zoom;
-        var northLat = this.origin.latitude - ZOOM_DELTA * this.zoom;
-        var southLat = this.origin.latitude + ZOOM_DELTA * this.zoom;
+        var westLong = this.origin.longitude + lngDelta;
+        var eastLong = this.origin.longitude - lngDelta;
+        var northLat = this.origin.latitude - latDelta;
+        var southLat = this.origin.latitude + latDelta;
         var pi = 3.1415926535898;
-        var mapLatBottomDegree = southLat  * pi / 180;
+        var mapLatBottomDegree = southLat * pi / 180;
         //var longitude = -6.266327;//-9.0503;
         //var latitude = 53.2734;
-        var mapLonDelta = eastLong - westLong;
+        var mapLngDelta = -lngDelta * 2;
 
-        var lontest = width - (lng - westLong) * (width / mapLonDelta);
+        var lontest = WIDTH - (lng - westLong) * (WIDTH / mapLngDelta);
 
         lat = lat * pi / 180;
-        var worldMapWidth = ((width / mapLonDelta) * 360) / (2 * pi);
+        var worldMapWidth = ((WIDTH / mapLngDelta) * 360) / (2 * pi);
         var mapOffsetY = (worldMapWidth / 2 * Math.log((1 + Math.sin(mapLatBottomDegree)) / (1 - Math.sin(mapLatBottomDegree ))));    
         var lattest = ((worldMapWidth / 2 * Math.log((1 + Math.sin(lat )) / (1 - Math.sin(lat )))) - mapOffsetY);
         return { x: lontest, y: lattest };
@@ -96,7 +98,7 @@ export default class SvgMap {
         }
 
         let { x: cx, y: cy } = this.project(this.origin.latitude, this.origin.longitude);
-        let visibleBuildings = this.tree.query(new Box(cx - this.offX / this.zoom - 200, cy - this.offY / this.zoom - 200, 400, 400));
+        let visibleBuildings = this.tree.query(new Box(cx - WIDTH * 0.6 / 2 - this.offX, cy - HEIGHT * 0.6 / 2 - this.offY, WIDTH * 0.6, HEIGHT * 0.6));
         
         for (let building of visibleBuildings) {
             // console.log(building);
