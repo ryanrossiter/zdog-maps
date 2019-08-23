@@ -1,12 +1,13 @@
 import Zdog from 'zdog';
 import { QuadTree, Box, Circle, Point } from 'js-quadtree';
 import Projection from './Projection';
+import Defs from './Defs';
 
 const ZOOM_DELTA = 0.001;
 const PAN_DELTA = 1;
 
 const MAX_ZOOM = 2.5;
-const MIN_ZOOM = 0.8;
+const MIN_ZOOM = 0.3;
 
 let frames = 0;
 let lastFrameTime = Date.now();
@@ -16,13 +17,14 @@ export default class ZdogMap {
     constructor({
         origin={ latitude: 44.24, longitude: -76.53},
         zoom=1,
-        buildings,
+        buildings, roads,
         zdogElement='.zdog-canvas'
     }) {
         this.container = document.querySelector(zdogElement);
         this.origin = origin;
         this.zoom = zoom;
         this.buildings = buildings;
+        this,roads = roads;
         this.offX = 0;
         this.offY = 0;
 
@@ -47,13 +49,22 @@ export default class ZdogMap {
         let points = [];
         for (let { center, ...rest } of buildings) {
             points.push({
+                type: Defs.MAP_ELEMENT_TYPES.BUILDING,
+                ...this.projection.project(center.latitude, center.longitude),
+                ...rest
+            });
+        }
+
+        for (let { center, ...rest } of roads) {
+            points.push({
+                type: Defs.MAP_ELEMENT_TYPES.ROAD,
                 ...this.projection.project(center.latitude, center.longitude),
                 ...rest
             });
         }
 
         this.tree = new QuadTree(
-            new Box(-1000, -1000, 2000, 2000), {
+            new Box(-5000, -5000, 10000, 10000), {
                 capacity: 1000,
             }, points);
 
@@ -130,22 +141,44 @@ export default class ZdogMap {
         return zdog;
     }
 
+    genZdogRoad(parent, path, color='#B33') {
+        let group = new Zdog.Group({ addTo: parent });
+        let zdog = {
+            group,
+            road: new Zdog.Shape({
+                addTo: group,
+                closed: false,
+                stroke: 8,
+                path,
+                color,
+            })
+        };
+    }
+
     genMap() {
         // empty the group before adding children
         this.zdog.mainGroup.children = [];
 
         let { x: cx, y: cy } = this.projection.project(this.origin.latitude, this.origin.longitude);
-        let visibleBuildings = this.tree.query(new Circle(cx - this.offX, cy - this.offY, this.zdog.illustration.width / this.zoom));
+        let visibleElements = this.tree.query(new Circle(cx - this.offX, cy - this.offY, this.zdog.illustration.width / this.zoom));
 
-        for (let building of visibleBuildings) {
+        for (let elem of visibleElements) {
             // console.log(building);
             // if (!this.inView(center.latitude, center.longitude)) continue;
 
-            if (!building.zdog) {
-                building.points = building.coordinates.map(([latitude, longitude]) => this.projection.project(latitude, longitude));
-                building.zdog = this.genZdogBuilding(this.zdog.mainGroup, building.points, 20);
+            if (!elem.zdog) {
+                elem.points = elem.coordinates.map(([latitude, longitude]) => this.projection.project(latitude, longitude));
+                switch (elem.type) {
+                    default:
+                    case Defs.MAP_ELEMENT_TYPES.BUILDING:
+                        elem.zdog = this.genZdogBuilding(this.zdog.mainGroup, elem.points, 20);
+                        break;
+                    case Defs.MAP_ELEMENT_TYPES.ROAD:
+                        elem.zdog = this.genZdogRoad(this.zdog.mainGroup, elem.points);
+                        break;
+                }
             } else {
-                this.zdog.mainGroup.addChild(building.zdog.group);
+                this.zdog.mainGroup.addChild(elem.zdog.group);
             }
         }
 
